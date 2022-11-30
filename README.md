@@ -1,1 +1,1 @@
-# advent-of-code-y2022
+# Advent of Code 2022
