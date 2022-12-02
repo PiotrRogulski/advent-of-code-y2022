@@ -44,10 +44,8 @@ roundScore r@(Round _ ms) = roundOutcome r + myShapeScore ms
     myShapeScore (MS Paper) = 2
     myShapeScore (MS Scissors) = 3
 
-pt1 :: IO Int
-pt1 = getDay 2 <&> lines <&> map parseLine <&> map roundScore <&> sum
-
----------------------------------------------------------------------
+calculateFinalScore :: (String -> Round) -> IO Int
+calculateFinalScore parser = getDay 2 <&> lines <&> map parser <&> map roundScore <&> sum
 
 parseLine' :: String -> Round
 parseLine' [os, ' ', outcome] = Round (parseOpponentShape os) (parseMyShape ms)
@@ -71,5 +69,10 @@ parseLine' [os, ' ', outcome] = Round (parseOpponentShape os) (parseMyShape ms)
       _ -> error "Invalid outcome"
 parseLine' _ = error "Invalid line"
 
+--------------------------------------------------------------------------------
+
+pt1 :: IO Int
+pt1 = calculateFinalScore parseLine
+
 pt2 :: IO Int
-pt2 = getDay 2 <&> lines <&> map parseLine' <&> map roundScore <&> sum
+pt2 = calculateFinalScore parseLine'
