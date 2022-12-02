@@ -1,71 +1,68 @@
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Days.Day2 (module Days.Day2) where
 
+import Data.Char (ord)
 import Data.Functor ((<&>))
 import DayInput (getDay)
+import GHC.Char (chr)
 
 data Shape = Rock | Paper | Scissors deriving (Eq, Show)
 
-newtype OpponentShape = OS Shape deriving (Eq, Show)
+data Round = Round {opponent :: Shape, my :: Shape} deriving (Eq, Show)
 
-newtype MyShape = MS Shape deriving (Eq, Show)
+shapeToIdx :: Shape -> Int
+shapeToIdx Rock = 0
+shapeToIdx Paper = 1
+shapeToIdx Scissors = 2
 
-parseOpponentShape :: Char -> OpponentShape
-parseOpponentShape 'A' = OS Rock
-parseOpponentShape 'B' = OS Paper
-parseOpponentShape 'C' = OS Scissors
-parseOpponentShape _ = error "Invalid opponent shape"
+idxToShape :: Int -> Shape
+idxToShape 0 = Rock
+idxToShape 1 = Paper
+idxToShape 2 = Scissors
+idxToShape _ = error "Invalid shape index"
 
-parseMyShape :: Char -> MyShape
-parseMyShape 'X' = MS Rock
-parseMyShape 'Y' = MS Paper
-parseMyShape 'Z' = MS Scissors
-parseMyShape _ = error "Invalid my shape"
+charToShape :: Char -> Char -> Shape
+charToShape base = idxToShape . flip (-) (ord base) . ord
 
-data Round = Round OpponentShape MyShape deriving (Eq, Show)
+parseOpponentShape :: Char -> Shape
+parseOpponentShape = charToShape 'A'
+
+parseMyShape :: Char -> Shape
+parseMyShape = charToShape 'X'
 
 parseLine :: String -> Round
 parseLine [os, ' ', ms] = Round (parseOpponentShape os) (parseMyShape ms)
 parseLine _ = error "Invalid line"
 
 roundOutcome :: Round -> Int
-roundOutcome (Round (OS Rock) (MS Paper)) = 6
-roundOutcome (Round (OS Paper) (MS Scissors)) = 6
-roundOutcome (Round (OS Scissors) (MS Rock)) = 6
-roundOutcome (Round (OS Rock) (MS Scissors)) = 0
-roundOutcome (Round (OS Paper) (MS Rock)) = 0
-roundOutcome (Round (OS Scissors) (MS Paper)) = 0
-roundOutcome _ = 3
+roundOutcome r
+  | idxDiff == 0 = 3
+  | idxDiff == 1 = 0
+  | idxDiff == 2 = 6
+  | otherwise = error "Invalid shape index"
+  where
+    idxDiff = (shapeToIdx r.opponent - shapeToIdx r.my) `mod` 3
 
 roundScore :: Round -> Int
-roundScore r@(Round _ ms) = roundOutcome r + myShapeScore ms
-  where
-    myShapeScore :: MyShape -> Int
-    myShapeScore (MS Rock) = 1
-    myShapeScore (MS Paper) = 2
-    myShapeScore (MS Scissors) = 3
+roundScore r = roundOutcome r + shapeToIdx r.my + 1
 
 calculateFinalScore :: (String -> Round) -> IO Int
-calculateFinalScore parser = getDay 2 <&> lines <&> map parser <&> map roundScore <&> sum
+calculateFinalScore parser =
+  getDay 2
+    <&> lines
+    <&> map parser
+    <&> map roundScore
+    <&> sum
 
 parseLine' :: String -> Round
-parseLine' [os, ' ', outcome] = Round (parseOpponentShape os) (parseMyShape ms)
+parseLine' [os, ' ', outcome] = Round (parseOpponentShape os) (parseMyShape ms')
   where
-    ms = case outcome of
-      'X' -> case os of
-        'A' -> 'Z'
-        'B' -> 'X'
-        'C' -> 'Y'
-        _ -> error "Invalid opponent shape"
-      'Y' -> case os of
-        'A' -> 'X'
-        'B' -> 'Y'
-        'C' -> 'Z'
-        _ -> error "Invalid opponent shape"
-      'Z' -> case os of
-        'A' -> 'Y'
-        'B' -> 'Z'
-        'C' -> 'X'
-        _ -> error "Invalid opponent shape"
+    ms' = chr $ (ord os - ord 'A' + offset) `mod` 3 + ord 'X'
+    offset = case outcome of
+      'X' -> 2
+      'Y' -> 0
+      'Z' -> 1
       _ -> error "Invalid outcome"
 parseLine' _ = error "Invalid line"
 
