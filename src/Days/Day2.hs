@@ -11,16 +11,14 @@ data Shape = Rock | Paper | Scissors deriving (Eq, Show)
 
 data Round = Round {opponent :: Shape, my :: Shape} deriving (Eq, Show)
 
+shapeIdxMap :: [(Int, Shape)]
+shapeIdxMap = [(0, Rock), (1, Paper), (2, Scissors)]
+
 shapeToIdx :: Shape -> Int
-shapeToIdx Rock = 0
-shapeToIdx Paper = 1
-shapeToIdx Scissors = 2
+shapeToIdx s = fst $ head $ filter ((== s) . snd) shapeIdxMap
 
 idxToShape :: Int -> Shape
-idxToShape 0 = Rock
-idxToShape 1 = Paper
-idxToShape 2 = Scissors
-idxToShape _ = error "Invalid shape index"
+idxToShape idx = snd $ head $ filter ((== idx) . fst) shapeIdxMap
 
 charToShape :: Char -> Char -> Shape
 charToShape base = idxToShape . flip (-) (ord base) . ord
