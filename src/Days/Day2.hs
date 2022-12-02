@@ -54,9 +54,9 @@ calculateFinalScore parser =
     <&> sum
 
 parseLine' :: String -> Round
-parseLine' [os, ' ', outcome] = Round (parseOpponentShape os) (parseMyShape ms')
+parseLine' [os, ' ', outcome] = Round (parseOpponentShape os) (parseMyShape ms)
   where
-    ms' = chr $ (ord os - ord 'A' + offset) `mod` 3 + ord 'X'
+    ms = chr $ (ord os - ord 'A' + offset) `mod` 3 + ord 'X'
     offset = case outcome of
       'X' -> 2
       'Y' -> 0
