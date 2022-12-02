@@ -46,3 +46,30 @@ roundScore r@(Round _ ms) = roundOutcome r + myShapeScore ms
 
 pt1 :: IO Int
 pt1 = getDay 2 <&> lines <&> map parseLine <&> map roundScore <&> sum
+
+---------------------------------------------------------------------
+
+parseLine' :: String -> Round
+parseLine' [os, ' ', outcome] = Round (parseOpponentShape os) (parseMyShape ms)
+  where
+    ms = case outcome of
+      'X' -> case os of
+        'A' -> 'Z'
+        'B' -> 'X'
+        'C' -> 'Y'
+        _ -> error "Invalid opponent shape"
+      'Y' -> case os of
+        'A' -> 'X'
+        'B' -> 'Y'
+        'C' -> 'Z'
+        _ -> error "Invalid opponent shape"
+      'Z' -> case os of
+        'A' -> 'Y'
+        'B' -> 'Z'
+        'C' -> 'X'
+        _ -> error "Invalid opponent shape"
+      _ -> error "Invalid outcome"
+parseLine' _ = error "Invalid line"
+
+pt2 :: IO Int
+pt2 = getDay 2 <&> lines <&> map parseLine' <&> map roundScore <&> sum
