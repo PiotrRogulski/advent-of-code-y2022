@@ -24,7 +24,11 @@ filterByIndex predicate l = [el | (el, i) <- zip l [0 ..], predicate i]
 parseCommand :: String -> Command
 parseCommand s = Command {count, from = from - 1, to = to - 1}
   where
-    (count, from, to) = toParts $ map (read @Int) $ filterByIndex odd $ splitOn " " s
+    (count, from, to) =
+      splitOn " " s
+        & filterByIndex odd
+        & map read
+        & toParts
     toParts [c, f, t] = (c, f, t)
     toParts _ = error "Invalid command"
 
@@ -33,28 +37,41 @@ parseStacks s =
   s
     & init
     & transpose
-    & filterByIndex (\i -> i `mod` 4 == 1)
+    & filterByIndex ((== 1) . (`mod` 4))
     & map (filter (/= ' '))
 
 inputData :: IO (Stacks, [Command])
-inputData = do
-  parts <- getDay 5 <&> lines <&> splitOn [""] <&> separateParts
-  return $ parts & _1 %~ parseStacks & _2 %~ map parseCommand
+inputData =
+  getDay 5
+    <&> lines
+    <&> splitOn [""]
+    <&> separateParts
+    <&> _1 %~ parseStacks
+    <&> _2 %~ map parseCommand
   where
     separateParts [a, b] = (a, b)
     separateParts _ = error "Invalid input"
 
 executeCommand :: Stacks -> Command -> Stacks
 executeCommand stacks Command {count, from, to} =
-  stacks & (ix from %~ drop count) & (ix to %~ (++) elementToMove)
+  stacks
+    & ix from %~ drop count
+    & ix to %~ (elementToMove ++)
   where
     elementToMove = stacks ^. ix from & take count
 
 expandCommand :: Command -> [Command]
-expandCommand Command {count, from, to} = [Command 1 from to | _ <- [1 .. count]]
+expandCommand Command {count, from, to} = replicate count (Command 1 from to)
 
 pt1 :: IO [Char]
-pt1 = inputData <&> _2 %~ concatMap expandCommand <&> uncurry (foldl executeCommand) <&> map head
+pt1 =
+  inputData
+    <&> _2 %~ concatMap expandCommand
+    <&> uncurry (foldl executeCommand)
+    <&> map head
 
 pt2 :: IO [Char]
-pt2 = inputData <&> uncurry (foldl executeCommand) <&> map head
+pt2 =
+  inputData
+    <&> uncurry (foldl executeCommand)
+    <&> map head
