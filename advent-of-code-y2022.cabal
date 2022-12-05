@@ -21,6 +21,7 @@ executable advent-of-code-y2022
   build-depends:       base >= 4.7 && < 5
                         ,text
                         ,split
+                        ,lens
   ghc-options:         -Wall
                        -Wcompat
                        -Widentities
