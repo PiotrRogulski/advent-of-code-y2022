@@ -53,8 +53,8 @@ executeCommand stacks Command {count, from, to} =
 expandCommand :: Command -> [Command]
 expandCommand Command {count, from, to} = [Command 1 from to | _ <- [1 .. count]]
 
-pt1 :: IO Stacks
-pt1 = inputData <&> _2 %~ concatMap expandCommand <&> uncurry (foldl executeCommand)
+pt1 :: IO [Char]
+pt1 = inputData <&> _2 %~ concatMap expandCommand <&> uncurry (foldl executeCommand) <&> map head
 
-pt2 :: IO Stacks
-pt2 = inputData <&> uncurry (foldl executeCommand)
+pt2 :: IO [Char]
+pt2 = inputData <&> uncurry (foldl executeCommand) <&> map head
