@@ -1,5 +1,6 @@
 module Days.Day6 (module Days.Day6) where
 
+import Control.Arrow ((&&&))
 import Control.Lens ((<&>))
 import Data.List (nub)
 import Data.List.Split (divvy)
@@ -9,7 +10,7 @@ firstIndexWhere :: (a -> Bool) -> [a] -> Int
 firstIndexWhere predicate l = head [i | (el, i) <- zip l [0 ..], predicate el]
 
 hasNoDuplicates :: Eq a => [a] -> Bool
-hasNoDuplicates l = l == nub l
+hasNoDuplicates = uncurry (==) . (id &&& nub)
 
 task :: Int -> IO Int
 task n =
