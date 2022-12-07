@@ -10,7 +10,6 @@ import Data.List (isPrefixOf)
 import Data.List.Split (splitOn)
 import Data.Ord (comparing)
 import DayInput (getDay)
-import Debug.Trace (trace)
 
 data FsFile = FsFile String Int deriving (Show, Eq)
 
@@ -69,7 +68,6 @@ parseLine line
     toParts _ = error "Invalid line"
 
 executeLine :: ParseState -> OutputEntry -> ParseState
-executeLine (ParseState pwd fs) e | trace ("\n### executeLine (" ++ show pwd ++ ") (" ++ show fs ++ ") (" ++ show e ++ ")") False = undefined
 executeLine (ParseState pwd fs) e = case e of
   Cd dir -> ParseState (pwd ++ [dir]) fs
   CdUp -> ParseState (init pwd) fs
