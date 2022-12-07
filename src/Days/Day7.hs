@@ -1,10 +1,14 @@
 module Days.Day7 (module Days.Day7) where
 
+import Control.Arrow ((&&&))
+import Control.Lens ((%~))
+import Control.Lens.Combinators (_1, _2)
 import Control.Lens.Operators ((&))
-import Data.Foldable (foldl')
+import Data.Foldable (foldl', minimumBy)
 import Data.Functor ((<&>))
 import Data.List (isPrefixOf)
 import Data.List.Split (splitOn)
+import Data.Ord (comparing)
 import DayInput (getDay)
 import Debug.Trace (trace)
 
@@ -27,6 +31,9 @@ getNodeSize :: Fs -> Int
 getNodeSize (Leaf (FsFile _ size)) = size
 getNodeSize (Node _ children) = sum $ map getNodeSize children
 
+nodeWithSize :: Fs -> (Fs, Int)
+nodeWithSize = id &&& getNodeSize
+
 getAllNodes :: Fs -> [Fs]
 getAllNodes (Leaf _) = []
 getAllNodes (Node _ children) = children ++ concatMap getAllNodes children
@@ -34,6 +41,10 @@ getAllNodes (Node _ children) = children ++ concatMap getAllNodes children
 isDirWithMaxSize :: Int -> Fs -> Bool
 isDirWithMaxSize _ (Leaf _) = False
 isDirWithMaxSize maxSize node@(Node _ _) = getNodeSize node <= maxSize
+
+isDirWithMinSize :: Int -> Fs -> Bool
+isDirWithMinSize _ (Leaf _) = False
+isDirWithMinSize minSize node@(Node _ _) = getNodeSize node >= minSize
 
 data ParseState = ParseState {pwd :: [String], fs :: Fs} deriving (Show)
 
@@ -84,3 +95,16 @@ pt1 =
     <&> filter (isDirWithMaxSize 100000)
     <&> map getNodeSize
     <&> sum
+
+pt2 :: IO Int
+pt2 =
+  input
+    <&> fs
+    <&> nodeWithSize
+    <&> _2 %~ (70_000_000 -)
+    <&> _1 %~ getAllNodes
+    <&> _1 %~ filter (isDirWithMinSize 100_000)
+    <&> _1 %~ map (id &&& getNodeSize)
+    <&> (\(nodes, freeSpace) -> filter ((> 30_000_000) . (+ freeSpace) . snd) nodes)
+    <&> minimumBy (comparing snd)
+    <&> snd
