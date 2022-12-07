@@ -1,9 +1,13 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-partial-fields #-}
+
 module Days.Day7 (module Days.Day7) where
 
 import Control.Arrow ((&&&))
-import Control.Lens ((%~))
+import Control.Lens (filtered, (%~), (.~), (^.))
 import Control.Lens.Combinators (_1, _2)
 import Control.Lens.Operators ((&))
+import Control.Lens.TH (makeLenses)
 import Data.Foldable (foldl', minimumBy)
 import Data.Functor ((<&>))
 import Data.List (isPrefixOf)
@@ -13,17 +17,22 @@ import DayInput (getDay)
 
 data FsFile = FsFile String Int deriving (Show, Eq)
 
-data Fs = Leaf FsFile | Node String [Fs] deriving (Show, Eq)
+data Fs = Leaf FsFile | Node {_name :: String, _items :: [Fs]} deriving (Show, Eq)
+
+makeLenses ''Fs
 
 nodeHasName :: String -> Fs -> Bool
 nodeHasName _ (Leaf _) = False
-nodeHasName name (Node n _) = n == name
+nodeHasName n (Node nodeName _) = nodeName == n
 
 insert :: [String] -> Fs -> Fs -> Fs
-insert [] nodeToInsert node@(Node n children) = if node `elem` children then node else Node n $ children ++ [nodeToInsert]
-insert (p : ps) nodeToInsert (Node n children)
-  | any (nodeHasName p) children = Node n $ map (\c -> if nodeHasName p c then insert ps nodeToInsert c else c) children
-  | otherwise = Node n $ children ++ [insert ps nodeToInsert (Node p [])]
+insert [] nodeToInsert node@(Node _ children) =
+  if nodeToInsert `elem` children
+    then node
+    else node & items %~ (++ [nodeToInsert])
+insert (p : ps) nodeToInsert node@(Node _ _)
+  | any (nodeHasName p) (node ^. items) = node & items %~ (traverse . filtered (nodeHasName p) %~ insert ps nodeToInsert)
+  | otherwise = node & items %~ (++ [insert ps nodeToInsert (Node p [])])
 insert _ _ (Leaf _) = error "Invalid node"
 
 getNodeSize :: Fs -> Int
@@ -37,15 +46,13 @@ getAllNodes :: Fs -> [Fs]
 getAllNodes (Leaf _) = []
 getAllNodes (Node _ children) = children ++ concatMap getAllNodes children
 
-isDirWithMaxSize :: Int -> Fs -> Bool
-isDirWithMaxSize _ (Leaf _) = False
-isDirWithMaxSize maxSize node@(Node _ _) = getNodeSize node <= maxSize
+isDirWithSize :: (Int -> Bool) -> Fs -> Bool
+isDirWithSize _ (Leaf _) = False
+isDirWithSize sizePred node = sizePred $ getNodeSize node
 
-isDirWithMinSize :: Int -> Fs -> Bool
-isDirWithMinSize _ (Leaf _) = False
-isDirWithMinSize minSize node@(Node _ _) = getNodeSize node >= minSize
+data ParseState = ParseState {_pwd :: [String], _fs :: Fs} deriving (Show)
 
-data ParseState = ParseState {pwd :: [String], fs :: Fs} deriving (Show)
+makeLenses ''ParseState
 
 data OutputEntry
   = Cd String
@@ -64,44 +71,43 @@ parseLine line
   | otherwise = uncurry FileEntry fileParts
   where
     fileParts = toParts $ splitOn " " line
-    toParts [size, name] = (name, read size)
+    toParts [size, n] = (n, read size)
     toParts _ = error "Invalid line"
 
 executeLine :: ParseState -> OutputEntry -> ParseState
-executeLine (ParseState pwd fs) e = case e of
-  Cd dir -> ParseState (pwd ++ [dir]) fs
-  CdUp -> ParseState (init pwd) fs
-  CdRoot -> ParseState [] fs
-  FileEntry name size -> ParseState pwd $ insert pwd (Leaf (FsFile name size)) fs
-  DirEntry name -> ParseState pwd $ insert pwd (Node name []) fs
+executeLine st e = case e of
+  Cd dir -> st & pwd %~ (++ [dir])
+  CdUp -> st & pwd %~ init
+  CdRoot -> st & pwd .~ []
+  FileEntry fileName size -> st & fs %~ insert (st ^. pwd) (Leaf (FsFile fileName size))
+  DirEntry dirName -> st & fs %~ insert (st ^. pwd) (Node dirName [])
 
 reducer :: ParseState -> String -> ParseState
-reducer (ParseState pwd fs) line = line & parseLine & executeLine (ParseState pwd fs)
+reducer st line = line & parseLine & executeLine st
 
-input :: IO ParseState
+input :: IO Fs
 input =
   getDay 7
     <&> lines
     <&> filter (/= "$ ls")
     <&> foldl' reducer (ParseState [] (Node "/" []))
+    <&> (^. fs)
 
 pt1 :: IO Int
 pt1 =
   input
-    <&> fs
     <&> getAllNodes
-    <&> filter (isDirWithMaxSize 100000)
+    <&> filter (isDirWithSize (< 100_000))
     <&> map getNodeSize
     <&> sum
 
 pt2 :: IO Int
 pt2 =
   input
-    <&> fs
     <&> nodeWithSize
     <&> _2 %~ (70_000_000 -)
     <&> _1 %~ getAllNodes
-    <&> _1 %~ filter (isDirWithMinSize 100_000)
+    <&> _1 %~ filter (isDirWithSize (> 100_000))
     <&> _1 %~ map (id &&& getNodeSize)
     <&> (\(nodes, freeSpace) -> filter ((> 30_000_000) . (+ freeSpace) . snd) nodes)
     <&> minimumBy (comparing snd)
