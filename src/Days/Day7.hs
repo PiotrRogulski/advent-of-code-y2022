@@ -23,6 +23,18 @@ insert (p : ps) nodeToInsert (Node n children)
   | otherwise = Node n $ children ++ [insert ps nodeToInsert (Node p [])]
 insert _ _ (Leaf _) = error "Invalid node"
 
+getNodeSize :: Fs -> Int
+getNodeSize (Leaf (FsFile _ size)) = size
+getNodeSize (Node _ children) = sum $ map getNodeSize children
+
+getAllNodes :: Fs -> [Fs]
+getAllNodes (Leaf _) = []
+getAllNodes (Node _ children) = children ++ concatMap getAllNodes children
+
+isDirWithMaxSize :: Int -> Fs -> Bool
+isDirWithMaxSize _ (Leaf _) = False
+isDirWithMaxSize maxSize node@(Node _ _) = getNodeSize node <= maxSize
+
 data ParseState = ParseState {pwd :: [String], fs :: Fs} deriving (Show)
 
 data OutputEntry
@@ -64,3 +76,11 @@ input =
     <&> filter (/= "$ ls")
     <&> foldl' reducer (ParseState [] (Node "/" []))
 
+pt1 :: IO Int
+pt1 =
+  input
+    <&> fs
+    <&> getAllNodes
+    <&> filter (isDirWithMaxSize 100000)
+    <&> map getNodeSize
+    <&> sum
