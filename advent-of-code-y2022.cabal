@@ -22,6 +22,7 @@ executable advent-of-code-y2022
                         ,text
                         ,split
                         ,lens
+                        ,utility-ht
   ghc-options:         -Wall
                        -Wcompat
                        -Widentities
