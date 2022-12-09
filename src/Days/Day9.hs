@@ -2,6 +2,7 @@
 
 module Days.Day9 (module Days.Day9) where
 
+import Control.Arrow (Arrow ((&&&)), (>>>))
 import Control.Lens (makeLenses, (%~), (^.))
 import Control.Lens.Combinators (ix)
 import Control.Lens.Operators ((.~))
@@ -45,15 +46,11 @@ moveLink ::
 moveLink h@(hx, hy) t@(tx, ty)
   | h == t = t
   | abs (hx - tx) <= 1 && abs (hy - ty) <= 1 = t
-  | hx == tx = (tx, ty + signum (hy - ty))
-  | hy == ty = (tx + signum (hx - tx), ty)
   | otherwise = (tx + signum (hx - tx), ty + signum (hy - ty))
 
 moveRope :: Rope -> Direction -> Rope
-moveRope r d = r'
+moveRope r d = r & theRope .~ newRope & visited %~ (last newRope :)
   where
-    r' = r & theRope .~ newRope & visited %~ (last newRope :)
-
     newHead = r ^. theRope & head & moveHead d
 
     newRope = newHead : moveRopeInner (r ^. theRope & (ix 0 .~ newHead))
@@ -61,9 +58,7 @@ moveRope r d = r'
     moveRopeInner :: [Position] -> [Position]
     moveRopeInner [] = error "Empty rope"
     moveRopeInner [_] = []
-    moveRopeInner (x : y : xs) = y' : moveRopeInner (y' : xs)
-      where
-        y' = moveLink x y
+    moveRopeInner (x : y : xs) = moveLink x y & ((id &&& (moveRopeInner . (: xs))) >>> uncurry (:))
 
 input :: IO [Direction]
 input =
@@ -72,18 +67,15 @@ input =
     <&> map parseMultiCommand
     <&> concatMap expandMultiCommand
 
+processCommands :: Int -> [Direction] -> Int
+processCommands n =
+  foldl' moveRope (makeRope n)
+    >>> (visited %~ nub)
+    >>> (^. visited)
+    >>> length
+
 pt1 :: IO Int
-pt1 =
-  input
-    <&> foldl' moveRope (makeRope 2)
-    <&> (visited %~ nub)
-    <&> (^. visited)
-    <&> length
+pt1 = input <&> processCommands 2
 
 pt2 :: IO Int
-pt2 =
-  input
-    <&> foldl' moveRope (makeRope 10)
-    <&> (visited %~ nub)
-    <&> (^. visited)
-    <&> length
+pt2 = input <&> processCommands 10
