@@ -24,6 +24,7 @@ executable advent-of-code-y2022
                         ,lens
                         ,utility-ht
   ghc-options:         -Wall
+                       -Wextra
                        -Wcompat
                        -Widentities
                        -Wincomplete-record-updates
