@@ -3,7 +3,7 @@ module Days.Day10 (module Days.Day10) where
 import Control.Arrow ((>>>))
 import Data.Function ((&))
 import Data.Functor ((<&>))
-import Data.List (scanl')
+import Data.List (isPrefixOf, scanl')
 import Data.List.Split (chunksOf)
 import DayInput (getDay)
 
@@ -11,8 +11,9 @@ data Command = Noop | AddX Int deriving (Show, Eq)
 
 parseCommand :: String -> Command
 parseCommand "noop" = Noop
-parseCommand ('a' : 'd' : 'd' : 'x' : ' ' : n) = AddX (read n)
-parseCommand _ = error "Invalid input"
+parseCommand cmd
+  | "addx " `isPrefixOf` cmd = cmd & drop 5 & read & AddX
+  | otherwise = error "Invalid input"
 
 expandCommand :: Command -> [Command]
 expandCommand Noop = [Noop]
@@ -31,7 +32,10 @@ input =
     <&> scanl' executeCommand 1
 
 pickSignals :: [Int] -> [Int] -> [Int]
-pickSignals idx xs = zip [1 ..] xs & filter ((`elem` idx) . fst) & map (uncurry (*))
+pickSignals idx =
+  zip [1 ..]
+    >>> filter ((`elem` idx) . fst)
+    >>> map (uncurry (*))
 
 pt1 :: IO Int
 pt1 =
@@ -43,7 +47,9 @@ screenWidth :: Int
 screenWidth = 40
 
 charForSignalInTime :: Int -> Int -> Char
-charForSignalInTime t n = if abs (n - (t `mod` screenWidth)) <= 1 then '#' else '.'
+charForSignalInTime t n
+  | abs (n - (t `mod` screenWidth)) <= 1 = '#'
+  | otherwise = '.'
 
 pt2 :: IO ()
 pt2 =
