@@ -23,6 +23,7 @@ executable advent-of-code-y2022
                         ,split
                         ,lens
                         ,utility-ht
+                        ,parsec
   ghc-options:         -Wall
                        -Wextra
                        -Wcompat
