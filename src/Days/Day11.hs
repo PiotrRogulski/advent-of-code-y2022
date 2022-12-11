@@ -13,30 +13,34 @@ import Data.Functor ((<&>))
 import Data.List (partition, sortBy)
 import Data.List.Split (splitOn)
 import DayInput (getDay)
+import Debug.Trace (trace)
 import Text.Parsec (anyChar, char, many1, manyTill, newline, oneOf, parse, space, string)
 import Text.Parsec.Char (digit)
 import Text.Parsec.String (Parser)
 import Text.ParserCombinators.Parsec ((<|>))
 
-type ItemValue = Integer
+type ItemValue = Int
 
 data Monkey = Monkey
   { _items :: [ItemValue],
     _operation :: ItemValue -> ItemValue,
     _action :: ItemValue -> Int,
+    _divisor :: Int,
     _count :: Int
   }
 
 makeLenses ''Monkey
 
 instance Show Monkey where
-  show Monkey {_items = its, _count = cnt} =
+  show Monkey {_items = its, _count = cnt, _divisor = d} =
     ""
       ++ show (its & length)
       ++ ": "
       ++ show its
       ++ " "
       ++ show cnt
+      ++ " "
+      ++ show d
 
 parseList :: Parser [ItemValue]
 parseList = do
@@ -57,7 +61,7 @@ parseOperation = do
     "old" -> uncurry opFun . (id &&& id)
     v -> opFun (read v)
 
-parseAction :: Parser (ItemValue -> Int)
+parseAction :: Parser (Int, ItemValue -> Int)
 parseAction = do
   _ <- string "  Test: divisible by "
   val <- many1 digit
@@ -68,10 +72,13 @@ parseAction = do
   _ <- string "    If false: throw to monkey "
   m2 <- many1 digit
   _ <- newline
-  return $ \n ->
-    if n `mod` read val == 0
-      then read m1
-      else read m2
+  return $
+    ( read val,
+      \n ->
+        if n `mod` read val == 0
+          then read m1
+          else read m2
+    )
 
 parseMonkey :: Parser Monkey
 parseMonkey = do
@@ -88,8 +95,9 @@ parseMonkey = do
     Monkey
       { _items = vals,
         _operation = op,
-        _action = act,
-        _count = 0
+        _action = snd act,
+        _count = 0,
+        _divisor = fst act
       }
 
 type ExchangeItem =
@@ -97,16 +105,19 @@ type ExchangeItem =
     ItemValue -- item to exchange
   )
 
+ringValue :: Int
+ringValue = product [2, 3, 5, 7, 11, 13, 17, 19]
+
 processMonkey1 :: Monkey -> [ExchangeItem]
 processMonkey1 m = zip targets newItems
   where
-    newItems = m ^. items & map ((`div` 3) . (m ^. operation))
+    newItems = m ^. items & map ((`mod` ringValue) . (`div` 3) . (m ^. operation))
     targets = newItems & map (m ^. action)
 
 processMonkey2 :: Monkey -> [ExchangeItem]
 processMonkey2 m = zip targets newItems
   where
-    newItems = m ^. items & map (m ^. operation)
+    newItems = m ^. items & map ((`mod` ringValue) . (m ^. operation))
     targets = newItems & map (m ^. action)
 
 updateMonkeysWithItems :: [Monkey] -> [ExchangeItem] -> [Monkey]
@@ -149,14 +160,17 @@ input =
     <&> map (parse parseMonkey "input11.txt")
     <&> map (^?! _Right)
 
+processChunk :: Int -> (Monkey -> [ExchangeItem]) -> [Monkey] -> [Monkey]
+processChunk s mProc !ms = foldr' ($!) ms (replicate s (processMonkeys mProc))
+
 pt1 :: IO Int
 pt1 =
   input
-    <&> flip (foldr' ($)) (replicate 20 (processMonkeys processMonkey1))
+    <&> processChunk 20 processMonkey1
     <&> monkeyBusiness
 
 pt2 :: IO Int
 pt2 =
   input
-    <&> flip (foldr' ($)) (replicate 10000 (processMonkeys processMonkey2))
+    <&> flip (foldr' ($)) (replicate 400 (processChunk 25 processMonkey2))
     <&> monkeyBusiness
