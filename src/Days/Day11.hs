@@ -2,11 +2,12 @@
 
 module Days.Day11 (module Days.Day11) where
 
-import Control.Arrow (Arrow (first, (***)), (&&&))
+import Control.Arrow (Arrow (first, (***)), (&&&), (>>>))
 import Control.Lens (makeLenses, (+~), (.~), (^?!), _Right)
 import Control.Lens.Combinators (_1, _2)
 import Control.Lens.Operators ((%~), (^.))
 import Data.Composition ((.:))
+import Data.Foldable (foldr')
 import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.List (partition, sortBy)
@@ -17,10 +18,12 @@ import Text.Parsec.Char (digit)
 import Text.Parsec.String (Parser)
 import Text.ParserCombinators.Parsec ((<|>))
 
+type ItemValue = Integer
+
 data Monkey = Monkey
-  { _items :: [Int],
-    _operation :: Int -> Int,
-    _action :: Int -> Int,
+  { _items :: [ItemValue],
+    _operation :: ItemValue -> ItemValue,
+    _action :: ItemValue -> Int,
     _count :: Int
   }
 
@@ -35,12 +38,12 @@ instance Show Monkey where
       ++ " "
       ++ show cnt
 
-parseList :: Parser [Int]
+parseList :: Parser [ItemValue]
 parseList = do
   vals <- many1 (many1 digit <|> string ", ")
   return $ vals & filter (/= ", ") & map read
 
-parseOperation :: Parser (Int -> Int)
+parseOperation :: Parser (ItemValue -> ItemValue)
 parseOperation = do
   _ <- string "  Operation: new = old "
   op <- oneOf "+*"
@@ -54,7 +57,7 @@ parseOperation = do
     "old" -> uncurry opFun . (id &&& id)
     v -> opFun (read v)
 
-parseAction :: Parser (Int -> Int)
+parseAction :: Parser (ItemValue -> Int)
 parseAction = do
   _ <- string "  Test: divisible by "
   val <- many1 digit
@@ -91,17 +94,20 @@ parseMonkey = do
 
 type ExchangeItem =
   ( Int, -- target Monkey ID
-    Int -- item to exchange
+    ItemValue -- item to exchange
   )
 
-processMonkey :: Monkey -> [ExchangeItem]
-processMonkey m = zip targets newItems
+processMonkey1 :: Monkey -> [ExchangeItem]
+processMonkey1 m = zip targets newItems
   where
     newItems = m ^. items & map ((`div` 3) . (m ^. operation))
     targets = newItems & map (m ^. action)
 
-exchangeItems :: [Monkey] -> [ExchangeItem]
-exchangeItems = concatMap processMonkey
+processMonkey2 :: Monkey -> [ExchangeItem]
+processMonkey2 m = zip targets newItems
+  where
+    newItems = m ^. items & map (m ^. operation)
+    targets = newItems & map (m ^. action)
 
 updateMonkeysWithItems :: [Monkey] -> [ExchangeItem] -> [Monkey]
 updateMonkeysWithItems ms its =
@@ -112,8 +118,8 @@ updateMonkeysWithItems ms its =
     | (m, i) <- zip ms [0 ..]
   ]
 
-processMonkeys :: [Monkey] -> [Monkey]
-processMonkeys ms = updateMonkeysWithItems monkeys' leftovers
+processMonkeys :: (Monkey -> [ExchangeItem]) -> [Monkey] -> [Monkey]
+processMonkeys mProc ms = updateMonkeysWithItems monkeys' leftovers
   where
     (monkeys', leftovers) = updateMonkey 0 ms
 
@@ -124,20 +130,15 @@ processMonkeys ms = updateMonkeysWithItems monkeys' leftovers
         & _1 %~ (monkey' :)
         & _2 %~ (backwardItems ++)
       where
-        (forwardItems, backwardItems) = partition ((> idx) . fst) (processMonkey monkey) & _1 %~ map (first (subtract (idx + 1)))
+        (forwardItems, backwardItems) = partition ((> idx) . fst) (mProc monkey) & _1 %~ map (first (subtract (idx + 1)))
         monkey' = monkey & items .~ [] & count +~ (monkey ^. items & length)
 
-f :: Monkey -> Monkey -> (Int, Int)
-f = curry ((^. count) *** (^. count))
-
-g :: (Int, Int) -> Ordering
-g = uncurry (flip compare)
-
-h :: Monkey -> Monkey -> Ordering
-h = g .: f
-
 monkeyBusiness :: [Monkey] -> Int
-monkeyBusiness ms = ms & sortBy h & take 2 & map (^. count) & product
+monkeyBusiness =
+  sortBy (uncurry (flip compare) .: curry ((^. count) *** (^. count)))
+    >>> take 2
+    >>> map (^. count)
+    >>> product
 
 input :: IO [Monkey]
 input =
@@ -148,9 +149,14 @@ input =
     <&> map (parse parseMonkey "input11.txt")
     <&> map (^?! _Right)
 
+pt1 :: IO Int
 pt1 =
   input
-    <&> iterate processMonkeys
-    <&> take 21
-    <&> last
+    <&> flip (foldr' ($)) (replicate 20 (processMonkeys processMonkey1))
+    <&> monkeyBusiness
+
+pt2 :: IO Int
+pt2 =
+  input
+    <&> flip (foldr' ($)) (replicate 10000 (processMonkeys processMonkey2))
     <&> monkeyBusiness
