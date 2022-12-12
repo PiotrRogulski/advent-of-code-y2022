@@ -26,6 +26,7 @@ executable advent-of-code-y2022
                         ,parsec
                         ,composition
                         ,unordered-containers
+                        ,hashable
   ghc-options:         -Wall
                        -Wextra
                        -Wcompat
