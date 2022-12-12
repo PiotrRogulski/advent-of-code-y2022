@@ -4,24 +4,26 @@ module Days.Day12 (module Days.Day12) where
 
 import Control.Arrow (Arrow (first, second), (>>>))
 import Control.Lens ((&))
-import Control.Lens.Combinators (_3)
+import Control.Lens.Combinators (_2, _3)
 import Control.Lens.Operators ((%~))
 import Data.Char (ord)
 import Data.Functor ((<&>))
 import Data.HashMap.Strict qualified as HM
 import Data.Hashable (Hashable)
-import Data.Maybe (fromJust, mapMaybe)
+import Data.List (foldl1')
+import Data.Maybe (catMaybes, fromJust, mapMaybe)
+import Data.Profunctor.Product.Flatten (flatten3)
 import Data.Tuple.HT (uncurry3)
 import DayInput (getDay)
 
 newtype Graph a = Graph {unGraph :: [(a, [a])]} deriving (Show)
 
-dijkstra :: (Hashable a) => a -> a -> Graph a -> Int
+dijkstra :: (Hashable a) => a -> a -> Graph a -> Maybe Int
 dijkstra source target (Graph unGraph) = go (HM.singleton source 0) (HM.singleton source Nothing) [source]
   where
-    go _ _ [] = error "No path found"
+    go _ _ [] = Nothing
     go dists prevs (x : xs)
-      | x == target = dist dists x
+      | x == target = Just $ dist dists x
       | otherwise = go (HM.union dists newDists) (HM.union prevs newPrevs) (xs ++ newNodes)
       where
         newDists = HM.fromList $ map (,dist dists x + 1) (neighbors x)
@@ -72,6 +74,16 @@ withStartEnd m = (start, end, m)
     start = HM.toList m & filter (\(_, c) -> c == 'S') & head & fst
     end = HM.toList m & filter (\(_, c) -> c == 'E') & head & fst
 
+withEnd :: HM.HashMap Position Char -> (Position, HM.HashMap Position Char)
+withEnd m = (end, m)
+  where
+    end = HM.toList m & filter (\(_, c) -> c == 'E') & head & fst
+
+withAllFound :: Char -> HM.HashMap Position Char -> ([Position], HM.HashMap Position Char)
+withAllFound c m = (found, m)
+  where
+    found = HM.toList m & filter (\(_, c') -> c' == c) & map fst
+
 input :: IO (HM.HashMap Position Char)
 input =
   getDay 12
@@ -81,9 +93,23 @@ input =
     <&> concatMap flattenIndexes
     <&> HM.fromList
 
-pt1 :: IO Int
+pt1 :: IO (Maybe Int)
 pt1 =
   input
     <&> withStartEnd
     <&> _3 %~ mapToGraph
     <&> uncurry3 dijkstra
+
+distributeFirst :: ([a], b) -> [(a, b)]
+distributeFirst (xs, y) = map (,y) xs
+
+pt2 :: IO Int
+pt2 =
+  input
+    <&> withAllFound 'a'
+    <&> _2 %~ withEnd
+    <&> _2 %~ _2 %~ mapToGraph
+    <&> distributeFirst
+    <&> map (uncurry3 dijkstra . flatten3)
+    <&> catMaybes
+    <&> foldl1' min

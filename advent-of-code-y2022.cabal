@@ -27,6 +27,7 @@ executable advent-of-code-y2022
                         ,composition
                         ,unordered-containers
                         ,hashable
+                        ,product-profunctors
   ghc-options:         -Wall
                        -Wextra
                        -Wcompat
