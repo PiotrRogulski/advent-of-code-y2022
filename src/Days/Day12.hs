@@ -1,12 +1,11 @@
-{-# LANGUAGE LambdaCase #-}
-
 module Days.Day12 (module Days.Day12) where
 
-import Control.Arrow (Arrow (first, second), (>>>))
+import Control.Arrow (Arrow (first, second, (&&&)), (>>>))
 import Control.Lens ((&))
 import Control.Lens.Combinators (_2, _3)
 import Control.Lens.Operators ((%~))
 import Data.Char (ord)
+import Data.Composition ((.:))
 import Data.Functor ((<&>))
 import Data.HashMap.Strict qualified as HM
 import Data.Hashable (Hashable)
@@ -37,17 +36,17 @@ type Position = (Int, Int)
 type MapGraph = Graph Position
 
 parseLevel :: Char -> Int
-parseLevel = \case
-  'S' -> ord 'a'
-  'E' -> ord 'z'
-  s | s `elem` ['a' .. 'z'] -> ord s
-  _ -> error "Invalid map level"
+parseLevel 'S' = ord 'a'
+parseLevel 'E' = ord 'z'
+parseLevel s
+  | s `elem` ['a' .. 'z'] = ord s
+  | otherwise = error $ "Invalid level: " ++ show s
 
-mapLevel :: HM.HashMap Position Char -> Position -> Maybe Int
-mapLevel m pos = (HM.!?) m pos <&> parseLevel
+mapLevel :: Position -> HM.HashMap Position Char -> Maybe Int
+mapLevel = fmap parseLevel .: HM.lookup
 
 flattenIndexes :: (Int, [(Int, a)]) -> [(Position, a)]
-flattenIndexes (v, xs) = map (\(x, c) -> ((v, x), c)) xs
+flattenIndexes (v, xs) = map (first (v,)) xs
 
 mapToGraph :: HM.HashMap Position Char -> MapGraph
 mapToGraph m = Graph (HM.toList assocs)
@@ -60,29 +59,25 @@ mapToGraph m = Graph (HM.toList assocs)
         currLevel = parseLevel level
         levelsAround =
           mapMaybe
-            ( ($ pos) >>> (\p -> mapLevel m p <&> (p,))
-            )
-            [ second (+ 1),
-              second (subtract 1),
-              first (+ 1),
-              first (subtract 1)
-            ]
+            (($ pos) >>> (&&& (,)) (`mapLevel` m) >>> uncurry (<&>))
+            ([second, first] <*> [subtract 1, (+ 1)])
+
+findSymbol :: HM.HashMap Position Char -> Char -> [Position]
+findSymbol m c = HM.toList m & filter ((== c) . snd) & map fst
 
 withStartEnd :: HM.HashMap Position Char -> (Position, Position, HM.HashMap Position Char)
 withStartEnd m = (start, end, m)
   where
-    start = HM.toList m & filter (\(_, c) -> c == 'S') & head & fst
-    end = HM.toList m & filter (\(_, c) -> c == 'E') & head & fst
+    start = head $ findSymbol m 'S'
+    end = head $ findSymbol m 'E'
 
 withEnd :: HM.HashMap Position Char -> (Position, HM.HashMap Position Char)
 withEnd m = (end, m)
   where
-    end = HM.toList m & filter (\(_, c) -> c == 'E') & head & fst
+    end = head $ findSymbol m 'E'
 
 withAllFound :: Char -> HM.HashMap Position Char -> ([Position], HM.HashMap Position Char)
-withAllFound c m = (found, m)
-  where
-    found = HM.toList m & filter (\(_, c') -> c' == c) & map fst
+withAllFound c = flip findSymbol c &&& id
 
 input :: IO (HM.HashMap Position Char)
 input =
@@ -100,8 +95,8 @@ pt1 =
     <&> _3 %~ mapToGraph
     <&> uncurry3 dijkstra
 
-distributeFirst :: ([a], b) -> [(a, b)]
-distributeFirst (xs, y) = map (,y) xs
+distributeSecond :: ([a], b) -> [(a, b)]
+distributeSecond (xs, y) = [(x, y) | x <- xs]
 
 pt2 :: IO Int
 pt2 =
@@ -109,7 +104,7 @@ pt2 =
     <&> withAllFound 'a'
     <&> _2 %~ withEnd
     <&> _2 %~ _2 %~ mapToGraph
-    <&> distributeFirst
+    <&> distributeSecond
     <&> map (uncurry3 dijkstra . flatten3)
     <&> catMaybes
     <&> foldl1' min
