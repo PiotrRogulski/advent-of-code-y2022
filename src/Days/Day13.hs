@@ -4,6 +4,7 @@ import Control.Applicative ((<|>))
 import Control.Lens (both)
 import Control.Lens.Operators ((%~))
 import Data.Functor ((<&>))
+import Data.List (sort)
 import Data.List.Split (splitOn)
 import DayInput (getDay)
 import Text.Parsec (digit, many1, parse, sepBy)
@@ -65,3 +66,21 @@ pt1 =
     <&> filter ((<= EQ) . snd)
     <&> map fst
     <&> sum
+
+marker1 :: Tree Int
+marker1 = parseTree "[[2]]"
+
+marker2 :: Tree Int
+marker2 = parseTree "[[6]]"
+
+pt2 :: IO Int
+pt2 =
+  input
+    <&> concat
+    <&> map parseTree
+    <&> (++ [marker1, marker2])
+    <&> sort
+    <&> zip [1 ..]
+    <&> filter ((`elem` [marker1, marker2]) . snd)
+    <&> map fst
+    <&> product
