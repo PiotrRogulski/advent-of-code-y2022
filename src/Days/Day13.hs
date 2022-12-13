@@ -1,6 +1,7 @@
 module Days.Day13 (module Days.Day13) where
 
 import Control.Applicative ((<|>))
+import Control.Arrow ((>>>))
 import Control.Lens (both)
 import Control.Lens.Operators ((%~))
 import Data.Functor ((<&>))
@@ -12,7 +13,10 @@ import Text.Parsec.Char (char)
 import Text.Parsec.String (Parser)
 
 input :: IO [[String]]
-input = getDay 13 <&> lines <&> splitOn [""]
+input =
+  getDay 13
+    <&> lines
+    <&> splitOn [""]
 
 data Tree a = Leaf a | Node [Tree a] deriving (Eq)
 
@@ -33,24 +37,24 @@ instance Ord a => Ord (Tree a) where
     | otherwise = compare (head a) (head b) <> compare (tail a) (tail b)
 
 leafParser :: Parser (Tree Int)
-leafParser = do
-  n <- many1 digit
-  return $ Leaf (read n)
+leafParser =
+  many1 digit
+    <&> read
+    <&> Leaf
 
 nodeParser :: Parser (Tree Int)
-nodeParser = do
-  _ <- char '['
-  children <- sepBy treeParser (char ',')
-  _ <- char ']'
-  return $ Node children
+nodeParser =
+  char '['
+    >> sepBy treeParser (char ',')
+    >>= \children ->
+      char ']'
+        >> return (Node children)
 
 treeParser :: Parser (Tree Int)
 treeParser = leafParser <|> nodeParser
 
 parseTree :: String -> Tree Int
-parseTree s = case parse treeParser "" s of
-  Left err -> error $ show err
-  Right tree -> tree
+parseTree = parse treeParser "" >>> either (error . show) id
 
 listToPair :: [a] -> (a, a)
 listToPair [a, b] = (a, b)
