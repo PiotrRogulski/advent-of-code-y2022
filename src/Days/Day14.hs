@@ -8,6 +8,7 @@ import Data.HashMap.Strict qualified as HM
 import Data.HashSet qualified as HS
 import Data.List (nub)
 import Data.List.Split (divvy)
+import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 import DayInput (getDay)
 import GHC.List (iterate')
@@ -96,9 +97,46 @@ pourSand1 =
     >>> head
     >>> snd
 
+findBelow2 :: Map -> (Int, Int) -> ((Int, Int), MapTile)
+findBelow2 m (x, y) = findBelow1 m (x, y) & fromMaybe ((x, HM.keys m & map snd & maximum & (+ 2)), Rock)
+
+getAt2 :: Int -> Map -> (Int, Int) -> Maybe MapTile
+getAt2 bottomLevel m (x, y)
+  | y >= bottomLevel = Just Rock
+  | otherwise = m HM.!? (x, y)
+
+dropSand2 :: Int -> (Int, Int) -> Map -> (Bool, Map)
+dropSand2 bottomLevel source m
+  | source `HM.member` m = (False, m)
+  | snd source >= (HM.keys m & map snd & maximum & (+ 2)) = (False, m)
+  | otherwise = case (left, right) of
+      (Just _, Just _) -> (True, HM.insert (px, py - 1) Sand m)
+      (Nothing, _) -> dropSand2 bottomLevel (px - 1, py) m
+      (_, Nothing) -> dropSand2 bottomLevel (px + 1, py) m
+  where
+    ((px, py), _) = findBelow2 m source
+    left = getAt2 bottomLevel m (px - 1, py)
+    right = getAt2 bottomLevel m (px + 1, py)
+
+pourSand2 :: Int -> Map -> Map
+pourSand2 bottomLevel =
+  (True,)
+    >>> iterate' (dropSand2 bottomLevel sandSource . snd)
+    >>> dropWhile (snd >>> HM.keys >>> (sandSource `elem`) >>> not)
+    >>> head
+    >>> snd
+
 pt1 :: IO Int
 pt1 =
   initialMap
     <&> pourSand1
+    <&> HM.filter (== Sand)
+    <&> HM.size
+
+pt2 :: IO Int
+pt2 =
+  initialMap
+    <&> ((HM.keys >>> map snd >>> maximum) &&& id)
+    <&> uncurry pourSand2
     <&> HM.filter (== Sand)
     <&> HM.size
