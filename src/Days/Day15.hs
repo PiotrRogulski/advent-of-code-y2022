@@ -1,10 +1,15 @@
 module Days.Day15 (module Days.Day15) where
 
 import Control.Arrow (Arrow (second), first, (&&&), (***), (>>>))
+import Control.Parallel.Strategies (NFData, parMap, rdeepseq)
+import Data.Foldable (find)
+import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.List (nub)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromJust, isJust, mapMaybe)
+import Data.Tuple (swap)
 import DayInput (getDay)
+import GHC.Generics (Generic)
 import Text.Parsec (digit, many1, parse, string, (<|>))
 import Text.Parsec.String (Parser)
 
@@ -56,7 +61,9 @@ input =
 targetRow :: Int
 targetRow = 2_000_000
 
-data IntRange = IntRange Int Int deriving (Show)
+data IntRange = IntRange Int Int deriving (Show, Generic)
+
+instance NFData IntRange
 
 range :: (Int, Int) -> IntRange
 range = uncurry IntRange
@@ -86,3 +93,40 @@ pt1 =
     <&> first length
     <&> second rangesSpan
     <&> uncurry (flip (-))
+
+searchMax :: Int
+searchMax = 4_000_000
+
+generateRanges :: Int -> [Reading] -> [[IntRange]]
+generateRanges m rs = [map range (mapMaybe (readingScanRow y) rs) | y <- [0 .. m]]
+
+simplifyRanges :: IntRange -> IntRange -> [IntRange]
+simplifyRanges (IntRange a b) (IntRange c d)
+  | a <= c && d <= b = [IntRange a b]
+  | a > c && d > b = [IntRange c d]
+  | a <= c && c <= b = [IntRange a (max b d)]
+  | c <= a && a <= d = [IntRange c (max b d)]
+  | otherwise = [IntRange a b, IntRange c d]
+
+simplifyRanges' :: [IntRange] -> [IntRange]
+simplifyRanges' = foldr f []
+  where
+    f (IntRange a b) [] = [IntRange a b]
+    f (IntRange a b) (IntRange c d : rs) = simplifyRanges (IntRange a b) (IntRange c d) ++ rs
+
+findNotCovered :: Int -> Int -> [IntRange] -> Maybe Int
+findNotCovered from to rs = [from .. to] & find (not . flip inAnyRange rs)
+
+pt2 :: IO Integer
+pt2 =
+  input
+    <&> generateRanges searchMax
+    <&> map simplifyRanges'
+    <&> zip [0 ..]
+    <&> parMap rdeepseq (second (id &&& findNotCovered 0 searchMax))
+    <&> filter (isJust . snd . snd)
+    <&> head
+    <&> fst &&& fromJust . snd . snd
+    <&> swap
+    <&> first ((* 4_000_000) . fromIntegral)
+    <&> uncurry (+)
