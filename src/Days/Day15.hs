@@ -1,8 +1,8 @@
 module Days.Day15 (module Days.Day15) where
 
-import Control.Arrow (Arrow (second), first, (&&&), (***))
+import Control.Arrow (Arrow (second), first, (&&&), (***), (>>>))
 import Data.Functor ((<&>))
-import Data.HashSet qualified as HS
+import Data.List (nub)
 import Data.Maybe (catMaybes)
 import DayInput (getDay)
 import Text.Parsec (digit, many1, parse, string, (<|>))
@@ -56,16 +56,33 @@ input =
 targetRow :: Int
 targetRow = 2_000_000
 
+data IntRange = IntRange Int Int deriving (Show)
+
+range :: (Int, Int) -> IntRange
+range = uncurry IntRange
+
+inRange :: Int -> IntRange -> Bool
+inRange x (IntRange a b) = a <= x && x <= b
+
+inAnyRange :: Int -> [IntRange] -> Bool
+inAnyRange x = any (inRange x)
+
+rangesSpan :: [IntRange] -> Int
+rangesSpan =
+  concatMap (\(IntRange a b) -> [a, b])
+    >>> (maximum &&& minimum)
+    >>> uncurry (-)
+    >>> succ
+
 pt1 :: IO Int
 pt1 =
   input
     <&> (id &&& map (readingScanRow targetRow))
     <&> map beacon *** catMaybes
-    <&> second (map $ uncurry enumFromTo)
-    <&> second (map HS.fromList)
-    <&> second HS.unions
+    <&> second (map range)
+    <&> first nub
     <&> first (filter ((== targetRow) . snd))
-    <&> first (map fst)
-    <&> first HS.fromList
-    <&> uncurry (flip HS.difference)
-    <&> HS.size
+    <&> (\(bs, rs) -> (filter (`inAnyRange` rs) (map fst bs), rs))
+    <&> first length
+    <&> second rangesSpan
+    <&> uncurry (flip (-))
