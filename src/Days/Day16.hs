@@ -3,6 +3,7 @@ module Days.Day16 (module Days.Day16) where
 import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.HashMap.Strict qualified as HM
+import Data.HashSet qualified as HS
 import DayInput (getDay)
 import Text.Parsec (anyChar, choice, count, digit, many1, parse, sepBy, string, try)
 import Text.Parsec.String (Parser)
@@ -56,3 +57,25 @@ theGraph =
 
 startValve :: String
 startValve = "AA"
+
+walk :: Int -> Int -> String -> HS.HashSet String -> VolcanoGraph -> Int
+walk mLeft total start visited g
+  | mLeft == 0 = total
+  | otherwise =
+      let next = HM.lookupDefault [] start (edges g)
+       in maximum $
+            map
+              ( \s ->
+                  walk
+                    (mLeft - 1)
+                    ( total
+                        + ( if HS.member s visited
+                              then flowRate (nodes g HM.! start) * mLeft
+                              else 0
+                          )
+                    )
+                    s
+                    (HS.insert s visited)
+                    g
+              )
+              next
