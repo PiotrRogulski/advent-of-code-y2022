@@ -17,20 +17,20 @@ input =
     <&> map (("(" ++) . (++ ")"))
     <&> map (read @Coordinate)
 
-findAdjacent :: [Coordinate] -> Coordinate -> [(Coordinate, Coordinate)]
-findAdjacent points (x, y, z) =
-  filter
-    (`elem` points)
-    [ (x + 1, y, z),
-      (x - 1, y, z),
-      (x, y + 1, z),
-      (x, y - 1, z),
-      (x, y, z + 1),
-      (x, y, z - 1)
-    ]
-    <&> ((x, y, z),)
+neighbors :: Coordinate -> [Coordinate]
+neighbors (x, y, z) =
+  [ (x + 1, y, z),
+    (x - 1, y, z),
+    (x, y + 1, z),
+    (x, y - 1, z),
+    (x, y, z + 1),
+    (x, y, z - 1)
+  ]
 
-findAllAdjacent :: [Coordinate] -> [(Coordinate, Coordinate)]
+findAdjacent :: [Coordinate] -> Coordinate -> [Coordinate]
+findAdjacent points (x, y, z) = filter (`elem` points) (neighbors (x, y, z))
+
+findAllAdjacent :: [Coordinate] -> [Coordinate]
 findAllAdjacent [] = []
 findAllAdjacent (p : ps) = findAdjacent ps p ++ findAllAdjacent ps
 
@@ -39,14 +39,15 @@ pt1 =
   input
     <&> (length &&& id)
     <&> second findAllAdjacent
-    <&> ((* 6) *** length)
-    <&> second (* 2)
+    <&> ((* 6) *** (* 2) . length)
     <&> uncurry (-)
 
 getBounds :: [Coordinate] -> (Coordinate, Coordinate)
 getBounds points =
   let (x, y, z) = unzip3 points
-   in ((minimum x - 1, minimum y - 1, minimum z - 1), (maximum x + 1, maximum y + 1, maximum z + 1))
+   in ( (minimum x - 1, minimum y - 1, minimum z - 1),
+        (maximum x + 1, maximum y + 1, maximum z + 1)
+      )
 
 isInBounds :: (Coordinate, Coordinate) -> Coordinate -> Bool
 isInBounds ((x1, y1, z1), (x2, y2, z2)) (x, y, z) =
@@ -56,16 +57,6 @@ isInBounds ((x1, y1, z1), (x2, y2, z2)) (x, y, z) =
     && y <= y2
     && z >= z1
     && z <= z2
-
-neighbors :: Coordinate -> [Coordinate]
-neighbors (x, y, z) =
-  [ (x + 1, y, z),
-    (x - 1, y, z),
-    (x, y - 1, z),
-    (x, y + 1, z),
-    (x, y, z - 1),
-    (x, y, z + 1)
-  ]
 
 walk :: S.Set Coordinate -> S.Set Coordinate -> Int -> (Coordinate, Coordinate) -> S.Set Coordinate -> Int
 walk queue done acc bounds points
