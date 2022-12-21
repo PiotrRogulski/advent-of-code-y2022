@@ -7,6 +7,14 @@ import DayInput (getDay)
 
 data BinOp = BinOp String (Int -> Int -> Int)
 
+mkBinOp :: String -> BinOp
+mkBinOp s = BinOp s $ case s of
+  "+" -> (+)
+  "*" -> (*)
+  "/" -> div
+  "-" -> (-)
+  _ -> error "mkBinOp: invalid operator"
+
 instance Show BinOp where
   show (BinOp s _) = s
 
@@ -43,13 +51,7 @@ buildExpr root vars eqRoot m
   | eqRoot = Op (BinOp "-" (-)) (buildExpr arg1 vars False m) (buildExpr arg2 vars False m)
   | otherwise =
       Op
-        ( uncurry BinOp $ case op of
-            "+" -> ("+", (+))
-            "*" -> ("*", (*))
-            "/" -> ("/", div)
-            "-" -> ("-", (-))
-            _ -> error "buildExpr: invalid operator"
-        )
+        (mkBinOp op)
         (buildExpr arg1 vars False m)
         (buildExpr arg2 vars False m)
   where
@@ -78,46 +80,32 @@ solveExpr :: Int -> String -> Expr -> Int
 solveExpr _ _ (Const _) = error "solveExpr: expression is a constant"
 solveExpr _ _ (Var _) = error "solveExpr: expression is an unbound variable"
 solveExpr target var (Op (BinOp label _) left right) =
-  case (valLeft, valRight) of
+  case (nextValLeft, nextValRight) of
     (Just _, Just _) -> error "solveExpr: expression is fully bound"
     (Nothing, Nothing) -> error "solveExpr: variable on both sides of equality"
     (Just l, Nothing) -> case right of
-      Var v ->
-        if v /= var
-          then error "solveExpr: found a different variable"
-          else case label of
-            "+" -> target - l
-            "-" -> l - target
-            "*" -> target `div` l
-            "/" -> l `div` target
-            _ -> error "solveExpr: invalid operator"
-      Op {} -> case label of
-        "+" -> solveExpr (target - l) var right
-        "-" -> solveExpr (l - target) var right
-        "*" -> solveExpr (target `div` l) var right
-        "/" -> solveExpr (l `div` target) var right
-        _ -> error "solveExpr: invalid operator"
+      Var v -> if v == var then l else error "solveExpr: found a different variable"
+      Op {} -> solveExpr l var right
       _ -> error "solveExpr: invalid expression"
     (Nothing, Just r) -> case left of
-      Var v ->
-        if v /= var
-          then error "solveExpr: found a different variable"
-          else case label of
-            "+" -> target - r
-            "-" -> target + r
-            "*" -> target `div` r
-            "/" -> target * r
-            _ -> error "solveExpr: invalid operator"
-      Op {} -> case label of
-        "+" -> solveExpr (target - r) var left
-        "-" -> solveExpr (target + r) var left
-        "*" -> solveExpr (target `div` r) var left
-        "/" -> solveExpr (target * r) var left
-        _ -> error "solveExpr: invalid operator"
+      Var v -> if v == var then r else error "solveExpr: found a different variable"
+      Op {} -> solveExpr r var left
       _ -> error "solveExpr: invalid expression"
   where
-    valLeft = evalExpr left
-    valRight = evalExpr right
+    nextValLeft =
+      evalExpr left <&> case label of
+        "+" -> (target -)
+        "-" -> subtract target
+        "*" -> (target `div`)
+        "/" -> (`div` target)
+        _ -> error "solveExpr: invalid operator"
+    nextValRight =
+      evalExpr right <&> case label of
+        "+" -> (target -)
+        "-" -> (+ target)
+        "*" -> (target `div`)
+        "/" -> (* target)
+        _ -> error "solveExpr: invalid operator"
 
 pt2 :: IO Int
 pt2 =
